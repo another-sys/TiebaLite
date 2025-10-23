@@ -193,6 +193,19 @@
     <string name="title_signing_progress">%1$s正在签到中 (%2$d/%3$d)</string>
     <string name="text_oksign_done">共签到 %1$d 个吧</string>
     <string name="summary_copy_bduss">请勿泄露，否则可能会导致您的账号被盗用</string>
+    <string name="title_token_manage">凭证管理</string>
+    <string name="title_current_bduss">当前BDUSS</string>
+    <string name="title_current_stoken">当前STOKEN</string>
+    <string name="title_manual_token_login">手动输入凭证登录</string>
+    <string name="summary_manual_token_login">从其他设备复制Token进行登录，无需重新验证</string>
+    <string name="hint_input_bduss">请输入BDUSS</string>
+    <string name="hint_input_stoken">请输入STOKEN</string>
+    <string name="toast_input_token_error">请输入完整的BDUSS和STOKEN</string>
+    <string name="toast_token_login_success">Token登录成功</string>
+    <string name="toast_token_login_failed">Token登录失败，请检查Token是否正确</string>
+    <string name="toast_token_login_failed_with_error">Token登录失败：%s</string>
+    <string name="toast_copied_to_clipboard">%s已复制到剪贴板</string>
+    <string name="button_confirm">确认</string>
 
     <string name="title_share_pic">分享图片</string>
     <string name="tip_permission_storage_download">用于下载文件</string>

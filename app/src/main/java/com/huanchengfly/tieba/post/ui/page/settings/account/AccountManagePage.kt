@@ -1,8 +1,15 @@
 package com.huanchengfly.tieba.post.ui.page.settings.account
 
+import android.content.ClipData
+import android.content.ClipboardManager
+import android.content.Context
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.MaterialTheme
@@ -14,8 +21,12 @@ import androidx.compose.material.icons.outlined.AddCircleOutline
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.SupervisedUserCircle
+import androidx.compose.material.CircularProgressIndicator
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -51,6 +62,10 @@ import com.huanchengfly.tieba.post.utils.appPreferences
 import com.huanchengfly.tieba.post.utils.launchUrl
 import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 @OptIn(ExperimentalMaterialApi::class, ExperimentalComposeUiApi::class)
 @Destination
@@ -76,6 +91,20 @@ fun AccountManagePage(
     ) { paddingValues ->
         val account = LocalAccount.current
         val context = LocalContext.current
+        val coroutineScope = androidx.compose.runtime.rememberCoroutineScope()
+
+        // 将这些状态变量移到外层作用域，以便在未登录状态下也能访问
+        var inputBduss by remember { mutableStateOf("") }
+        var inputStoken by remember { mutableStateOf("") }
+        var isLoading by remember { mutableStateOf(false) }
+        var showDialog by remember { mutableStateOf(false) }
+
+        fun copyToClipboard(context: Context, text: String, label: String) {
+            val clipboardManager = context.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+            val clipData = ClipData.newPlainText(label, text)
+            clipboardManager.setPrimaryClip(clipData)
+            Toast.makeText(context, context.getString(R.string.toast_copied_to_clipboard, label), Toast.LENGTH_SHORT).show()
+        }
         PrefsScreen(
             dataStore = LocalContext.current.dataStore,
             dividerThickness = 0.dp,
@@ -101,7 +130,11 @@ fun AccountManagePage(
                                 )
                             }
                         },
-                        onValueChange = { AccountUtil.switchAccount(context, it.toInt()) },
+                        onValueChange = {
+                            coroutineScope.launch {
+                                AccountUtil.switchAccount(context, it.toInt())
+                            }
+                        },
                         enabled = true,
                         defaultValue = account.id.toString(),
                         entries = AllAccounts.current.associate {
@@ -129,7 +162,17 @@ fun AccountManagePage(
             prefsItem {
                 TextPref(
                     title = stringResource(id = R.string.title_new_account),
-                    onClick = { navigator.navigate(LoginPageDestination) },
+                    onClick = {
+                        // 在未登录状态下，也显示手动输入token的对话框
+                        // 这样用户可以选择手动输入token而不是去百度登录
+                        if (account == null) {
+                            // 直接显示手动输入token的对话框
+                            showDialog = true
+                        } else {
+                            // 已登录状态下，还是跳转到登录页面
+                            navigator.navigate(LoginPageDestination)
+                        }
+                    },
                     leadingIcon = {
                         LeadingIcon {
                             AvatarIcon(
@@ -166,7 +209,11 @@ fun AccountManagePage(
             prefsItem {
                 TextPref(
                     title = stringResource(id = R.string.title_exit_account),
-                    onClick = { AccountUtil.exit(context) },
+                    onClick = {
+                        coroutineScope.launch {
+                            AccountUtil.exit(context)
+                        }
+                    },
                     leadingIcon = {
                         LeadingIcon {
                             AvatarIcon(
@@ -178,6 +225,66 @@ fun AccountManagePage(
                     },
                 )
             }
+            // 当前账号Token查看部分
+            if (account != null) {
+                prefsItem {
+                    TextPref(
+                        title = stringResource(id = R.string.title_current_bduss),
+                        summary = account.bduss,
+                        leadingIcon = {
+                            LeadingIcon {
+                                AvatarIcon(
+                                    icon = Icons.Outlined.ContentCopy,
+                                    size = Sizes.Small,
+                                    contentDescription = null,
+                                )
+                            }
+                        },
+                        onClick = {
+                            copyToClipboard(context, account.bduss, "BDUSS")
+                        }
+                    )
+                }
+                prefsItem {
+                    TextPref(
+                        title = stringResource(id = R.string.title_current_stoken),
+                        summary = account.sToken,
+                        leadingIcon = {
+                            LeadingIcon {
+                                AvatarIcon(
+                                    icon = Icons.Outlined.ContentCopy,
+                                    size = Sizes.Small,
+                                    contentDescription = null,
+                                )
+                            }
+                        },
+                        onClick = {
+                            copyToClipboard(context, account.sToken, "STOKEN")
+                        }
+                    )
+                }
+            }
+
+            // 手动设置Token部分
+            prefsItem {
+                TextPref(
+                    title = stringResource(id = R.string.title_manual_token_login),
+                    summary = stringResource(id = R.string.summary_manual_token_login),
+                    leadingIcon = {
+                        LeadingIcon {
+                            AvatarIcon(
+                                icon = Icons.Outlined.Edit,
+                                size = Sizes.Small,
+                                contentDescription = null,
+                            )
+                        }
+                    },
+                    onClick = {
+                        showDialog = true
+                    }
+                )
+            }
+
             prefsItem {
                 TextPref(
                     title = stringResource(id = R.string.title_modify_username),
@@ -200,6 +307,7 @@ fun AccountManagePage(
                     enabled = account != null
                 )
             }
+
             prefsItem {
                 TextPref(
                     title = stringResource(id = R.string.title_copy_bduss),
@@ -217,6 +325,7 @@ fun AccountManagePage(
                     enabled = account != null
                 )
             }
+
             prefsItem {
                 val littleTail = remember { context.appPreferences.littleTail }
                 EditTextPref(
@@ -239,6 +348,109 @@ fun AccountManagePage(
                     dialogTitle = stringResource(id = R.string.title_dialog_modify_little_tail),
                 )
             }
+        }
+
+        // AlertDialog需要放在PrefsScreen外部，但在Scaffold内部
+        if (showDialog) {
+            androidx.compose.material.AlertDialog(
+                onDismissRequest = { showDialog = false },
+                title = { Text(text = stringResource(id = R.string.title_manual_token_login)) },
+                text = {
+                    androidx.compose.foundation.layout.Column {
+                        androidx.compose.material.TextField(
+                            value = inputBduss,
+                            onValueChange = { inputBduss = it },
+                            label = { Text(text = stringResource(id = R.string.hint_input_bduss)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = false,
+                            maxLines = 3,
+                        )
+                        androidx.compose.foundation.layout.Spacer(modifier = Modifier.height(8.dp))
+                        androidx.compose.material.TextField(
+                            value = inputStoken,
+                            onValueChange = { inputStoken = it },
+                            label = { Text(text = stringResource(id = R.string.hint_input_stoken)) },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = false,
+                            maxLines = 3,
+                        )
+                    }
+                },
+                confirmButton = {
+                    if (isLoading) {
+                        CircularProgressIndicator(modifier = Modifier.size(24.dp))
+                    } else {
+                        androidx.compose.material.TextButton(
+                            onClick = {
+                                if (inputBduss.isBlank() || inputStoken.isBlank()) {
+                                    Toast.makeText(
+                                        context,
+                                        R.string.toast_input_token_error,
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    return@TextButton
+                                }
+
+                                isLoading = true
+                                coroutineScope.launch {
+                                    try {
+                                        withContext(Dispatchers.IO) {
+                                            AccountUtil.fetchAccountFlow(
+                                                inputBduss.trim(),
+                                                inputStoken.trim()
+                                            ).collect { fetchedAccount ->
+                                                AccountUtil.newAccount(
+                                                    fetchedAccount.uid,
+                                                    fetchedAccount
+                                                ) { success ->
+                                                    // Launch a new coroutine to handle the callback
+                                                    GlobalScope.launch(Dispatchers.Main) {
+                                                        if (success) {
+                                                            Toast.makeText(
+                                                                context,
+                                                                R.string.toast_token_login_success,
+                                                                Toast.LENGTH_SHORT
+                                                            ).show()
+                                                            AccountUtil.switchAccount(context, fetchedAccount.id)
+                                                        } else {
+                                                            Toast.makeText(
+                                                                context,
+                                                                R.string.toast_token_login_failed,
+                                                                Toast.LENGTH_SHORT
+                                                            ).show()
+                                                        }
+                                                        isLoading = false
+                                                        showDialog = false
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    } catch (e: Exception) {
+                                        withContext(Dispatchers.Main) {
+                                            Toast.makeText(
+                                                context,
+                                                context.getString(R.string.toast_token_login_failed_with_error, e.message),
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+                                            isLoading = false
+                                            showDialog = false
+                                        }
+                                    }
+                                }
+                            }
+                        ) {
+                            Text(text = stringResource(id = R.string.button_confirm))
+                        }
+                    }
+                },
+                dismissButton = {
+                    androidx.compose.material.TextButton(
+                        onClick = { showDialog = false }
+                    ) {
+                        Text(text = stringResource(id = R.string.button_cancel))
+                    }
+                }
+            )
         }
     }
 }

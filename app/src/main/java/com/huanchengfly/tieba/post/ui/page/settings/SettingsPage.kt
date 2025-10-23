@@ -85,7 +85,7 @@ fun NowAccountItem(
             title = stringResource(id = R.string.title_account_manage),
             summary = stringResource(id = R.string.summary_not_logged_in),
             enabled = true,
-            onClick = { navigator.navigate(LoginPageDestination) },
+            onClick = { navigator.navigate(AccountManagePageDestination) },
             leadingIcon = {
                 LeadingIcon {
                     AvatarIcon(
