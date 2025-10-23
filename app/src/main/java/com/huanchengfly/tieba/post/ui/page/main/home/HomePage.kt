@@ -321,7 +321,12 @@ private fun ForumItemContent(
         // 头像在左
         AnimatedVisibility(visible = true) {
             Row {
-                Avatar(data = item.avatar, size = 40.dp, contentDescription = null)
+                Avatar(
+                    data = item.avatar,
+                    size = 40.dp,
+                    contentDescription = null,
+                    shape = RoundedCornerShape(30)
+                )
                 Spacer(modifier = Modifier.width(10.dp))
             }
         }
