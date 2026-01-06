@@ -130,6 +130,11 @@ open class AppPreferencesUtils private constructor(ctx: Context) {
 
     var homePageScroll by DataStoreDelegates.boolean(defaultValue = false)
 
+    var homePageSortType by DataStoreDelegates.string(
+        key = "home_page_sort_type",
+        defaultValue = "LEVEL"  // 默认使用等级排序
+    )
+
     var homePageShowHistoryForum by DataStoreDelegates.boolean(defaultValue = true)
 
     var imageDarkenWhenNightMode by DataStoreDelegates.boolean(defaultValue = true)

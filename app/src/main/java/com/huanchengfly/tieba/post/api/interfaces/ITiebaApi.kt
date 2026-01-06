@@ -1346,7 +1346,7 @@ interface ITiebaApi {
      *
      * **需登录**
      *
-     * @param sortType 排序（0=更新排序 1=等级排序）
+     * @param sortType 排序（1=关注时间 2=等级排序）
      */
     fun forumGuideNewFlow(
         sortType: Int = 2

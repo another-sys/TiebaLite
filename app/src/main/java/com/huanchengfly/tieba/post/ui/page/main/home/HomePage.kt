@@ -36,6 +36,8 @@ import androidx.compose.material.Surface
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.DropdownMenu
+import androidx.compose.material.icons.outlined.Sort
 import androidx.compose.material.icons.outlined.ViewAgenda
 import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Search
@@ -105,6 +107,7 @@ import com.huanchengfly.tieba.post.utils.ImageUtil
 import com.huanchengfly.tieba.post.utils.TiebaUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
 import kotlinx.collections.immutable.persistentListOf
+import androidx.compose.runtime.collectAsState
 
 // 辅助函数：格式化热度值，将大数值转换为简洁格式（如1231000 -> 123.1w）
 private fun formatHotNum(num: Int): String {
@@ -203,6 +206,135 @@ private fun Header(
             .then(modifier),
         invertColor = invert
     )
+}
+
+@Composable
+private fun SortButton(
+    currentSortType: SortType,
+    onSortTypeChange: (SortType) -> Unit
+) {
+    var expanded by remember { mutableStateOf(false) }
+    println("Current sort type in UI: $currentSortType")
+    Box(
+        modifier = Modifier
+            .height(28.dp)
+            .clip(RoundedCornerShape(14.dp))
+            .background(ExtendedTheme.colors.chip)
+            .clickable {
+                expanded = !expanded
+            }
+            .padding(horizontal = 12.dp),
+        contentAlignment = Center
+    ) {
+        Row(
+            verticalAlignment = CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
+            Icon(
+                imageVector = Icons.Outlined.Sort,
+                contentDescription = stringResource(id = R.string.title_sort),
+                modifier = Modifier.size(16.dp),
+                tint = ExtendedTheme.colors.onChip
+            )
+            Text(
+                        text = when (currentSortType) {
+                            SortType.HOT_NUM -> stringResource(id = R.string.sort_hot_num)
+                            SortType.LEVEL -> stringResource(id = R.string.sort_level).replace("默认", "等级排序")
+                            SortType.FOLLOW -> stringResource(id = R.string.sort_follow)
+                        },
+                        fontSize = 12.sp,
+                        color = ExtendedTheme.colors.onChip
+                    )
+        }
+
+        // 排序下拉菜单
+        DropdownMenu(
+            expanded = expanded,
+            onDismissRequest = { expanded = false },
+            modifier = Modifier
+                .background(ExtendedTheme.colors.background)
+                .width(140.dp)
+        ) {
+            DropdownMenuItem(
+                onClick = {
+                    if (currentSortType != SortType.LEVEL) {
+                        onSortTypeChange(SortType.LEVEL)
+                    }
+                    expanded = false
+                }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                            text = stringResource(id = R.string.sort_level).replace("默认", "等级排序"),
+                            fontSize = 14.sp
+                        )
+                    if (currentSortType == SortType.LEVEL) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+            DropdownMenuItem(
+                onClick = {
+                    if (currentSortType != SortType.HOT_NUM) {
+                        onSortTypeChange(SortType.HOT_NUM)
+                    }
+                    expanded = false
+                }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = stringResource(id = R.string.sort_hot_num),
+                        fontSize = 14.sp
+                    )
+                    if (currentSortType == SortType.HOT_NUM) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+            DropdownMenuItem(
+                onClick = {
+                    if (currentSortType != SortType.FOLLOW) {
+                        onSortTypeChange(SortType.FOLLOW)
+                    }
+                    expanded = false
+                }
+            ) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Text(
+                        text = stringResource(id = R.string.sort_follow),
+                        fontSize = 14.sp
+                    )
+                    if (currentSortType == SortType.FOLLOW) {
+                        Icon(
+                            imageVector = Icons.Rounded.Check,
+                            contentDescription = null,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+        }
+    }
 }
 
 @Composable
@@ -699,15 +831,35 @@ fun HomePage(
                                 )
                             }
                         }
-                        if (showHistoryForum || hasTopForum) {
-                            item(key = "ForumHeader", span = { GridItemSpan(maxLineSpan) }) {
-                                Column(
-                                    modifier = Modifier.padding(vertical = 8.dp)
-                                ) {
-                                    Header(text = stringResource(id = R.string.forum_list_title))
+                        if (true) {
+                    item(key = "ForumHeader", span = { GridItemSpan(maxLineSpan) }) {
+                        Column(
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(end = 12.dp),
+                                verticalAlignment = CenterVertically,
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                // 计算签到
+                                val signedCount = forums.count { it.isSign }
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Header(text = stringResource(id = R.string.forum_list_title) + " ${forums.size}/${signedCount}")
+                                    Spacer(modifier = Modifier.width(8.dp))
                                 }
+                                // 排序按钮
+                                SortButton(
+                                    currentSortType = viewModel.uiState.collectAsState().value.sortType,
+                                    onSortTypeChange = { sortType ->
+                                        viewModel.send(HomeUiIntent.ChangeSortType(sortType))
+                                    }
+                                )
                             }
                         }
+                    }
+                }
                         items(
                             items = forums,
                             key = { it.forumId }

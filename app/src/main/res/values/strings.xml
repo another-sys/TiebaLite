@@ -547,4 +547,7 @@
     <string name="release_to_load_latest_posts">松开加载最新回复</string>
     <string name="pull_to_load_latest_posts">继续上拉加载最新回复</string>
     <string name="settings_home_page_show_history_forum">首页显示最近逛的吧</string>
+    <string name="sort_follow">关注时间</string>
+    <string name="sort_hot_num">热度值</string>
+    <string name="sort_level">等级</string>
 </resources>
