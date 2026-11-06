@@ -1,4 +1,5 @@
 <resources>
+    <string name="image_unavailable">[图片暂不可用]</string>
     <string name="app_name">贴吧 Lite</string>
     <string name="title_notifications">消息</string>
     <string name="title_explore">动态</string>

@@ -13,6 +13,7 @@ import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
@@ -2243,6 +2244,7 @@ fun PostCard(
                                     SubPostItem(
                                         subPostList = item.subPost,
                                         subPostContent = item.subPostContent,
+                                        images = item.images,
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .padding(horizontal = 12.dp),
@@ -2285,6 +2287,7 @@ fun PostCard(
 private fun SubPostItem(
     subPostList: ImmutableHolder<SubPostList>,
     subPostContent: AnnotatedString,
+    images: ImmutableList<PicContentRender>,
     modifier: Modifier = Modifier,
     onReplyClick: ((SubPostList) -> Unit)?,
     onOpenSubPosts: (Long) -> Unit,
@@ -2339,23 +2342,33 @@ private fun SubPostItem(
             onOpenSubPosts(subPostList.get { id })
         }
     ) {
-        ProvideTextStyle(value = MaterialTheme.typography.body2.copy(color = ExtendedTheme.colors.text)) {
-            PbContentText(
-                text = subPostContent,
-                modifier = modifier,
-                fontSize = 13.sp,
-                emoticonSize = 0.9f,
-                overflow = TextOverflow.Ellipsis,
-                maxLines = 4,
-                lineSpacing = 0.4.sp,
-                inlineContent = mapOf(
-                    "Lz" to buildChipInlineContent(
-                        stringResource(id = R.string.tip_lz),
-                        backgroundColor = ExtendedTheme.colors.textSecondary.copy(alpha = 0.1f),
-                        color = ExtendedTheme.colors.textSecondary
-                    ),
+        Column(modifier = modifier, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            ProvideTextStyle(value = MaterialTheme.typography.body2.copy(color = ExtendedTheme.colors.text)) {
+                PbContentText(
+                    text = subPostContent,
+                    fontSize = 13.sp,
+                    emoticonSize = 0.9f,
+                    overflow = TextOverflow.Ellipsis,
+                    maxLines = 4,
+                    lineSpacing = 0.4.sp,
+                    inlineContent = mapOf(
+                        "Lz" to buildChipInlineContent(
+                            stringResource(id = R.string.tip_lz),
+                            backgroundColor = ExtendedTheme.colors.textSecondary.copy(alpha = 0.1f),
+                            color = ExtendedTheme.colors.textSecondary
+                        ),
+                    )
                 )
-            )
+            }
+            if (images.isNotEmpty()) {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(bottom = 4.dp),
+                ) {
+                    images.fastForEach { it.ThumbnailRender() }
+                }
+            }
         }
     }
 }

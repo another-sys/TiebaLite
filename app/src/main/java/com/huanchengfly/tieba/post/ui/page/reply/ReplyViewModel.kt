@@ -179,6 +179,7 @@ class ReplyViewModel @Inject constructor() :
                     isOriginImage
                 )
                 .map<List<UploadPictureResultBean>, ReplyPartialChange.UploadImages> {
+                    it.forEach { image -> image.toReplyImageMarkup() }
                     ReplyPartialChange.UploadImages.Success(it)
                 }
                 .onStart { emit(ReplyPartialChange.UploadImages.Start) }

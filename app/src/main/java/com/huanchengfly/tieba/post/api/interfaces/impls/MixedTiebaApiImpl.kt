@@ -1355,11 +1355,12 @@ object MixedTiebaApiImpl : ITiebaApi {
         mark: Int,
         lastPostId: Long?,
     ): Flow<PbPageResponse> {
-        return RetrofitTiebaApi.OFFICIAL_PROTOBUF_TIEBA_V12_API.pbPageFlow(
+        // V12 replaces images inside sub-post previews with plain "[图片]" text.
+        return RetrofitTiebaApi.OFFICIAL_PROTOBUF_TIEBA_V22_API.pbPageFlow(
             buildProtobufRequestBody(
                 PbPageRequest(
                     PbPageRequestData(
-                        common = buildCommonRequest(clientVersion = ClientVersion.TIEBA_V12),
+                        common = buildCommonRequest(clientVersion = ClientVersion.TIEBA_V22),
                         kz = threadId,
                         pid = postId,
                         pn = page,
@@ -1407,7 +1408,7 @@ object MixedTiebaApiImpl : ITiebaApi {
                         with_floor = 1
                     )
                 ),
-                clientVersion = ClientVersion.TIEBA_V12
+                clientVersion = ClientVersion.TIEBA_V22
             )
         )
     }

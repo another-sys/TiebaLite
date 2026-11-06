@@ -12,11 +12,13 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.InlineTextContent
 import androidx.compose.material.ExperimentalMaterialApi
 import androidx.compose.material.LocalTextStyle
 import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.mutableStateOf
@@ -137,6 +139,10 @@ data class PicContentRender(
 ) : PbContentRender {
     @Composable
     override fun Render() {
+        if (picUrl.isBlank()) {
+            Text(stringResource(R.string.image_unavailable))
+            return
+        }
         val widthFraction =
             if (LocalWindowSizeClass.current.widthSizeClass == WindowWidthSizeClass.Compact) 1f else 0.5f
         val context = LocalContext.current
@@ -148,9 +154,24 @@ data class PicContentRender(
                 .focusable()
                 .clip(RoundedCornerShape(context.appPreferences.radius.dp))
                 .fillMaxWidth(widthFraction)
-                .aspectRatio(width * 1f / height),
+                .aspectRatio((if (width > 0 && height > 0) width.toFloat() / height else 1f).coerceIn(0.2f, 5f)),
             photoViewData = photoViewData,
             contentScale = ContentScale.Crop
+        )
+    }
+
+    @Composable
+    fun ThumbnailRender() {
+        if (picUrl.isBlank()) {
+            Text(stringResource(R.string.image_unavailable))
+            return
+        }
+        NetworkImage(
+            imageUri = picUrl,
+            contentDescription = stringResource(R.string.desc_image),
+            modifier = Modifier.size(72.dp).clip(RoundedCornerShape(6.dp)),
+            photoViewData = photoViewData,
+            contentScale = ContentScale.Crop,
         )
     }
 

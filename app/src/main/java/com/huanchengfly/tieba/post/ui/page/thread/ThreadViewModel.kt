@@ -37,6 +37,7 @@ import com.huanchengfly.tieba.post.removeAt
 import com.huanchengfly.tieba.post.repository.EmptyDataException
 import com.huanchengfly.tieba.post.repository.PbPageRepository
 import com.huanchengfly.tieba.post.ui.common.PbContentRender
+import com.huanchengfly.tieba.post.ui.common.PicContentRender
 import com.huanchengfly.tieba.post.utils.BlockManager.shouldBlock
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.collections.immutable.ImmutableList
@@ -1297,6 +1298,8 @@ data class SubPostItemData(
     val subPost: ImmutableHolder<SubPostList>,
     val subPostContent: AnnotatedString,
     val blocked: Boolean = subPost.get { shouldBlock() },
+    val images: ImmutableList<PicContentRender> = subPost.get { contentRenders }
+        .filterIsInstance<PicContentRender>().toImmutableList(),
 ) {
     val id: Long
         get() = subPost.get { id }

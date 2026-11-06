@@ -28,6 +28,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.OpenInBrowser
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -46,9 +47,10 @@ import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.api.models.protos.SubPostList
 import com.huanchengfly.tieba.post.api.models.protos.User
 import com.huanchengfly.tieba.post.api.models.protos.bawuType
+import com.huanchengfly.tieba.post.arch.GlobalEvent
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
 import com.huanchengfly.tieba.post.arch.collectPartialAsState
-import com.huanchengfly.tieba.post.arch.onEvent
+import com.huanchengfly.tieba.post.arch.onGlobalEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
 import com.huanchengfly.tieba.post.arch.wrapImmutable
 import com.huanchengfly.tieba.post.ui.common.theme.compose.ExtendedTheme
@@ -90,7 +92,6 @@ import com.ramcosta.composedestinations.annotation.Destination
 import com.ramcosta.composedestinations.navigation.DestinationsNavigator
 import com.ramcosta.composedestinations.spec.DestinationStyleBottomSheet
 import kotlinx.collections.immutable.persistentListOf
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 @Destination
@@ -168,6 +169,7 @@ internal fun SubPostsContent(
                 subPostId.takeIf { loadFromSubPost } ?: 0L
             )
         )
+        viewModel.initialized = true
     }
 
     val isRefreshing by viewModel.uiState.collectPartialAsState(
@@ -216,10 +218,14 @@ internal fun SubPostsContent(
     )
 
     val lazyListState = rememberLazyListState()
+    var highlightedSubPostId by remember { mutableStateOf(subPostId) }
 
-    viewModel.onEvent<SubPostsUiEvent.ScrollToSubPosts> {
-        delay(20)
-        lazyListState.scrollToItem(2 + subPosts.indexOfFirst { it.id == subPostId })
+    LaunchedEffect(subPosts, highlightedSubPostId) {
+        val index = subPosts.indexOfFirst { it.id == highlightedSubPostId }
+        if (index >= 0) {
+            lazyListState.scrollToItem(2 + index)
+            highlightedSubPostId = 0L
+        }
     }
 
     val confirmDeleteDialogState = rememberDialogState()
@@ -275,18 +281,19 @@ internal fun SubPostsContent(
         ReplyDialog(args = currentReplyArgs!!, state = replyDialogState)
     }
 
-//    onGlobalEvent<GlobalEvent.ReplySuccess>(
-//        filter = { it.threadId == threadId && it.postId == postId }
-//    ) { event ->
-//        viewModel.send(
-//            SubPostsUiIntent.Load(
-//                forumId,
-//                threadId,
-//                postId,
-//                subPostId.takeIf { loadFromSubPost } ?: 0L
-//            )
-//        )
-//    }
+    onGlobalEvent<GlobalEvent.ReplySuccess>(
+        filter = { it.threadId == threadId && it.postId == (post?.get { id } ?: postId) }
+    ) { event ->
+        highlightedSubPostId = event.newSubPostId ?: 0L
+        viewModel.send(
+            SubPostsUiIntent.Load(
+                forumId = forum?.get { id } ?: forumId,
+                threadId = threadId,
+                postId = post?.get { id } ?: postId,
+                subPostId = highlightedSubPostId,
+            )
+        )
+    }
 
     fun showReplyDialog(args: ReplyArgs) {
         currentReplyArgs = args

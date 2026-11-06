@@ -63,6 +63,8 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.Alignment
@@ -87,10 +89,10 @@ import com.google.accompanist.drawablepainter.rememberDrawablePainter
 import com.huanchengfly.tieba.post.App
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.arch.GlobalEvent
+import com.huanchengfly.tieba.post.arch.GlobalEventFlow
 import com.huanchengfly.tieba.post.arch.collectPartialAsState
 import com.huanchengfly.tieba.post.arch.emitGlobalEvent
 import com.huanchengfly.tieba.post.arch.onEvent
-import com.huanchengfly.tieba.post.arch.onGlobalEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
 import com.huanchengfly.tieba.post.models.database.Draft
 import com.huanchengfly.tieba.post.pxToDpFloat
@@ -131,6 +133,7 @@ import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.sample
 import kotlinx.coroutines.launch
 import java.util.UUID
@@ -317,27 +320,12 @@ internal fun ReplyPageContent(
         }
     }
 
-    var waitUploadSuccessToSend by remember { mutableStateOf(false) }
-    viewModel.onEvent<ReplyUiEvent.UploadSuccess> {
-        if (waitUploadSuccessToSend) {
-            waitUploadSuccessToSend = false
-            val imageContent = it.resultList
-                .joinToString("\n") { image ->
-                    "#(pic,${image.picId ?: 0},${image.picInfo?.originPic?.width ?: 0},${image.picInfo?.originPic?.height ?: 0})"
-                }
-            viewModel.send(
-                ReplyUiIntent.Send(
-                    "${getText()}\n$imageContent",
-                    forumId,
-                    forumName,
-                    threadId,
-                    curTbs,
-                    title = threadTitle.takeIf { isTopicThread },
-                    postId,
-                    subPostId,
-                    replyUserId,
-                )
-            )
+    // Keep the content and reply target from the Send tap while the upload is in flight.
+    var pendingImageReply by remember { mutableStateOf<ReplyUiIntent.Send?>(null) }
+    viewModel.onEvent<ReplyUiEvent.UploadSuccess> { event ->
+        pendingImageReply?.let { pending ->
+            pendingImageReply = null
+            viewModel.send(pending.copy(content = appendReplyImages(pending.content, event.resultList)))
         }
     }
 
@@ -602,32 +590,30 @@ internal fun ReplyPageContent(
                     modifier = Modifier.size(24.dp)
                 )
             }
-            if (postId == null || postId == 0L) {
-                IconButton(
-                    onClick = { switchToPanel(IMAGE) },
-                    modifier = Modifier.size(24.dp)
-                ) {
-                    BadgedBox(
-                        badge = {
-                            if (selectedImageList.isNotEmpty()) {
-                                Badge(
-                                    backgroundColor = ExtendedTheme.colors.accent,
-                                    contentColor = ExtendedTheme.colors.background,
-                                ) {
-                                    Text(
-                                        text = "${selectedImageList.size}",
-                                        style = MaterialTheme.typography.caption
-                                    )
-                                }
+            IconButton(
+                onClick = { switchToPanel(IMAGE) },
+                modifier = Modifier.size(24.dp)
+            ) {
+                BadgedBox(
+                    badge = {
+                        if (selectedImageList.isNotEmpty()) {
+                            Badge(
+                                backgroundColor = ExtendedTheme.colors.accent,
+                                contentColor = ExtendedTheme.colors.background,
+                            ) {
+                                Text(
+                                    text = "${selectedImageList.size}",
+                                    style = MaterialTheme.typography.caption
+                                )
                             }
                         }
-                    ) {
-                        Icon(
-                            imageVector = Icons.Outlined.InsertPhoto,
-                            contentDescription = stringResource(id = R.string.insert_photo),
-                            modifier = Modifier.size(24.dp)
-                        )
                     }
+                ) {
+                    Icon(
+                        imageVector = Icons.Outlined.InsertPhoto,
+                        contentDescription = stringResource(id = R.string.insert_photo),
+                        modifier = Modifier.size(24.dp)
+                    )
                 }
             }
 //            IconButton(
@@ -650,33 +636,23 @@ internal fun ReplyPageContent(
             } else {
                 IconButton(
                     onClick = {
-                        val replyContent = if (subPostId == null || subPostId == 0L) {
-                            getText()
-                        } else {
-                            "回复 #(reply, ${replyUserPortrait}, ${replyUserName}) :${getText()}"
-                        }
+                        val request = ReplyUiIntent.Send(
+                            content = buildReplyContent(getText(), subPostId, replyUserPortrait, replyUserName),
+                            forumId = forumId,
+                            forumName = forumName,
+                            threadId = threadId,
+                            tbs = curTbs,
+                            title = threadTitle.takeIf { isTopicThread },
+                            postId = postId,
+                            subPostId = subPostId,
+                            replyUserId = replyUserId,
+                        )
                         if (selectedImageList.isEmpty()) {
-                            viewModel.send(
-                                ReplyUiIntent.Send(
-                                    content = replyContent,
-                                    forumId = forumId,
-                                    forumName = forumName,
-                                    threadId = threadId,
-                                    tbs = curTbs,
-                                    title = threadTitle.takeIf { isTopicThread },
-                                    postId = postId,
-                                    subPostId = subPostId,
-                                    replyUserId = replyUserId
-                                )
-                            )
+                            viewModel.send(request)
                         } else {
-                            waitUploadSuccessToSend = true
+                            pendingImageReply = request
                             viewModel.send(
-                                ReplyUiIntent.UploadImages(
-                                    forumName,
-                                    selectedImageList,
-                                    isOriginImage
-                                )
+                                ReplyUiIntent.UploadImages(forumName, selectedImageList, isOriginImage)
                             )
                         }
                     },
@@ -890,13 +866,13 @@ private fun ImagePanel(
     onIsOriginImageChange: (Boolean) -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val id = remember { UUID.randomUUID().toString() }
+    val id = rememberSaveable { UUID.randomUUID().toString() }
     val coroutineScope = rememberCoroutineScope()
-    onGlobalEvent<GlobalEvent.SelectedImages>(
-        coroutineScope,
-        filter = { it.id == id }
-    ) {
-        onNewImageSelected(it.images)
+    val onImagesSelected by rememberUpdatedState(onNewImageSelected)
+    LaunchedEffect(id) {
+        GlobalEventFlow.filterIsInstance<GlobalEvent.SelectedImages>()
+            .filter { it.id == id }
+            .collect { onImagesSelected(it.images) }
     }
 
     Column(

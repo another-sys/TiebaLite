@@ -13,7 +13,6 @@ import com.huanchengfly.tieba.post.api.models.protos.ThreadInfo
 import com.huanchengfly.tieba.post.api.models.protos.User
 import com.huanchengfly.tieba.post.api.models.protos.contentRenders
 import com.huanchengfly.tieba.post.api.models.protos.pbFloor.PbFloorResponse
-import com.huanchengfly.tieba.post.api.models.protos.renders
 import com.huanchengfly.tieba.post.api.models.protos.updateAgreeStatus
 import com.huanchengfly.tieba.post.api.retrofit.exception.getErrorCode
 import com.huanchengfly.tieba.post.api.retrofit.exception.getErrorMessage
@@ -82,7 +81,7 @@ class SubPostsViewModel @Inject constructor() :
                     val subPosts = response.data_?.subpost_list.orEmpty().map {
                         SubPostItemData(
                             it.wrapImmutable(),
-                            it.content.renders.toImmutableList(),
+                            it.contentRenders,
                         )
                     }.toImmutableList()
                     SubPostsPartialChange.Load.Success(
@@ -109,7 +108,7 @@ class SubPostsViewModel @Inject constructor() :
                     val subPosts = response.data_?.subpost_list.orEmpty().map {
                         SubPostItemData(
                             it.wrapImmutable(),
-                            it.content.renders.toImmutableList(),
+                            it.contentRenders,
                         )
                     }.toImmutableList()
                     SubPostsPartialChange.LoadMore.Success(
@@ -381,7 +380,7 @@ data class SubPostItemData(
         subPost: SubPostList,
     ) : this(
         subPost.wrapImmutable(),
-        subPost.content.renders.toImmutableList(),
+        subPost.contentRenders,
         subPost.shouldBlock()
     )
 

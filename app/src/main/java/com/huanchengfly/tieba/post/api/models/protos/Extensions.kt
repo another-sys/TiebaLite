@@ -12,6 +12,8 @@ import androidx.compose.ui.text.withStyle
 import com.huanchengfly.tieba.post.App
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.arch.wrapImmutable
+import com.huanchengfly.tieba.post.models.PhotoViewData
+import com.huanchengfly.tieba.post.models.PicItem
 import com.huanchengfly.tieba.post.ui.common.PbContentRender
 import com.huanchengfly.tieba.post.ui.common.PicContentRender
 import com.huanchengfly.tieba.post.ui.common.TextContentRender.Companion.appendText
@@ -206,13 +208,13 @@ private val PbContent.picUrl: String
         ImageUtil.getUrl(
             App.INSTANCE,
             true,
-            originSrc,
-            bigCdnSrc,
-            bigSrc,
-            dynamic_,
-            cdnSrc,
-            cdnSrcActive,
-            src
+            originSrc.trim(),
+            bigCdnSrc.trim(),
+            bigSrc.trim(),
+            dynamic_.trim(),
+            cdnSrc.trim(),
+            cdnSrcActive.trim(),
+            src.trim()
         )
 
 val List<PbContent>.plainText: String
@@ -260,19 +262,7 @@ val List<PbContent>.renders: ImmutableList<PbContentRender>
                 }
 
                 3 -> {
-                    val width = it.bsize.split(",")[0].toInt()
-                    val height = it.bsize.split(",")[1].toInt()
-                    renders.add(
-                        PicContentRender(
-                            picUrl = it.picUrl,
-                            originUrl = it.originSrc,
-                            showOriginBtn = it.showOriginalBtn == 1,
-                            originSize = it.originSize,
-                            picId = ImageUtil.getPicId(it.originSrc),
-                            width = width,
-                            height = height
-                        )
-                    )
+                    renders.add(it.toPictureRender())
                 }
 
                 4 -> {
@@ -336,24 +326,51 @@ val List<PbContent>.renders: ImmutableList<PbContentRender>
                 }
 
                 20 -> {
-                    val width = it.bsize.split(",")[0].toInt()
-                    val height = it.bsize.split(",")[1].toInt()
-                    renders.add(
-                        PicContentRender(
-                            picUrl = it.src,
-                            originUrl = it.src,
-                            showOriginBtn = it.showOriginalBtn == 1,
-                            originSize = it.originSize,
-                            picId = ImageUtil.getPicId(it.src),
-                            width = width,
-                            height = height
-                        )
-                    )
+                    renders.add(it.toPictureRender())
                 }
             }
         }
 
         return renders.toImmutableList()
+    }
+
+// Some sub-post images only provide src and numeric dimensions, without bsize/originSrc.
+private fun PbContent.toPictureRender(): PicContentRender {
+    val previewUrl = picUrl.trim()
+    val originalUrl = originSrc.trim().ifBlank { previewUrl }
+    val dimensions = bsize.split(',').map { it.trim().toIntOrNull() }
+    val imageSize = when {
+        dimensions.size >= 2 && (dimensions[0] ?: 0) > 0 && (dimensions[1] ?: 0) > 0 ->
+            dimensions[0]!! to dimensions[1]!!
+        width > 0 && height > 0 -> width to height
+        else -> 1 to 1
+    }
+    return PicContentRender(
+        picUrl = previewUrl,
+        originUrl = originalUrl,
+        showOriginBtn = showOriginalBtn == 1,
+        originSize = originSize,
+        width = imageSize.first,
+        height = imageSize.second,
+        picId = if (originalUrl.isNotBlank()) ImageUtil.getPicId(originalUrl) else "",
+    )
+}
+
+// A sub-post owns its own gallery; do not ask the main-post image API for its pictures.
+val SubPostList.contentRenders: ImmutableList<PbContentRender>
+    get() {
+        val renders = content.renders
+        val pictures = renders.filterIsInstance<PicContentRender>().filter { it.picUrl.isNotBlank() }
+        val items = pictures.mapIndexed { index, image ->
+            PicItem(image.picId, index + 1, image.picUrl, image.originUrl,
+                image.showOriginBtn, image.originSize, postId = id)
+        }.toImmutableList()
+        var imageIndex = 0
+        return renders.map { render ->
+            if (render is PicContentRender && render.picUrl.isNotBlank()) {
+                render.copy(photoViewData = PhotoViewData(picItems = items, index = imageIndex++))
+            } else render
+        }.toImmutableList()
     }
 
 val Post.contentRenders: ImmutableList<PbContentRender>
@@ -418,11 +435,15 @@ fun SubPostList.getContentText(threadAuthorId: Long? = null): AnnotatedString {
             if (author?.id == threadAuthorId) {
                 appendInlineContent("Lz")
             }
-            append(": ")
+            // V22 includes the separator in the first text fragment of ordinary replies.
+            val firstText = content.firstOrNull()?.takeIf { it.type == 0 }?.text?.trimStart()
+            if (firstText?.startsWith(":") != true && firstText?.startsWith("：") != true) {
+                append(": ")
+            }
         }
     }
 
     val contentStrings = content.renders.map { it.toAnnotationString() }
 
-    return userNameString + contentStrings.reduce { acc, annotatedString -> acc + annotatedString }
+    return userNameString + contentStrings.fold(AnnotatedString("")) { acc, annotatedString -> acc + annotatedString }
 }
