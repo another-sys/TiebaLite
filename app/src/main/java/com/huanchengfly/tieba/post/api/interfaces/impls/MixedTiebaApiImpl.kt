@@ -40,6 +40,7 @@ import com.huanchengfly.tieba.post.api.models.PicPageBean
 import com.huanchengfly.tieba.post.api.models.Profile
 import com.huanchengfly.tieba.post.api.models.ProfileBean
 import com.huanchengfly.tieba.post.api.models.SearchForumBean
+import com.huanchengfly.tieba.post.api.models.ForumHeatBean
 import com.huanchengfly.tieba.post.api.models.SearchPostBean
 import com.huanchengfly.tieba.post.api.models.SearchThreadBean
 import com.huanchengfly.tieba.post.api.models.SearchUserBean
@@ -709,6 +710,9 @@ object MixedTiebaApiImpl : ITiebaApi {
 
     override fun searchForumFlow(keyword: String): Flow<SearchForumBean> =
         RetrofitTiebaApi.HYBRID_TIEBA_API.searchForumFlow(keyword)
+
+    override fun forumHeatFlow(forumName: String): Flow<ForumHeatBean> =
+        RetrofitTiebaApi.OFFICIAL_TIEBA_API.forumHeatFlow(forumName)
 
     override fun searchThread(
         keyword: String, page: Int, order: SearchThreadOrder, filter: SearchThreadFilter,

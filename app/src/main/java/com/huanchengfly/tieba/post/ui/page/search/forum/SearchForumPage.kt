@@ -5,11 +5,10 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.ExperimentalMaterialApi
@@ -18,6 +17,7 @@ import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MarkUnreadChatAlt
+import androidx.compose.material.icons.filled.LocalFireDepartment
 import androidx.compose.material.icons.filled.PersonOutline
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.pullRefresh
@@ -27,10 +27,11 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.produceState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.api.models.SearchForumBean
@@ -51,6 +52,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.MyLazyColumn
 import com.huanchengfly.tieba.post.ui.widgets.compose.Sizes
 import com.huanchengfly.tieba.post.ui.widgets.compose.debounceClickable
 import com.huanchengfly.tieba.post.ui.widgets.compose.states.StateScreen
+import com.huanchengfly.tieba.post.utils.StringUtil.getShortNumString
 import kotlinx.collections.immutable.persistentListOf
 
 @OptIn(ExperimentalMaterialApi::class, ExperimentalFoundationApi::class)
@@ -151,6 +153,7 @@ fun SearchForumPage(
                     item(key = "ExactMatch") {
                         SearchForumItem(
                             item = exactMatchForum!!,
+                            viewModel = viewModel,
                             onClick = {
                                 navigator.navigate(ForumPageDestination(exactMatchForum!!.forumName.orEmpty()))
                             }
@@ -171,9 +174,10 @@ fun SearchForumPage(
                             )
                         }
                     }
-                    items(fuzzyMatchForumList) {
+                    items(fuzzyMatchForumList, key = { it.forumId ?: it.forumName.orEmpty() }) {
                         SearchForumItem(
                             item = it,
+                            viewModel = viewModel,
                             onClick = {
                                 navigator.navigate(ForumPageDestination(it.forumName.orEmpty()))
                             }
@@ -197,10 +201,14 @@ fun SearchForumPage(
 @Composable
 private fun SearchForumItem(
     item: SearchForumBean.ForumInfoBean,
-    iconColor: Color = ExtendedTheme.colors.primary,
+    viewModel: SearchForumViewModel,
     onClick: () -> Unit,
 ) {
-    val postNumSting = stringResource(id = R.string.forum_concern_num, item.postNum)
+    val hotNum by produceState<Long?>(null, item.forumName, viewModel) {
+        value = null
+        value = viewModel.loadForumHeat(item.forumName.orEmpty())
+    }
+    val postNumString = stringResource(id = R.string.forum_post_num, item.postNum)
     val concernNumString = stringResource(id = R.string.forum_concern_num, item.concernNum)
     Row(
         modifier = Modifier
@@ -216,30 +224,24 @@ private fun SearchForumItem(
             contentDescription = item.forumNameShow
         )
         Column(
-            modifier = Modifier.fillMaxWidth().height(IntrinsicSize.Min),
-            verticalArrangement = Arrangement.SpaceBetween
+            modifier = Modifier.weight(1f),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             Text(
                 text = stringResource(id = R.string.title_forum, item.forumNameShow.orEmpty()),
                 style = MaterialTheme.typography.subtitle1,
                 maxLines = 1,
-                modifier = Modifier
-                    .weight(1f)
-                    .fillMaxWidth()
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.fillMaxWidth()
             )
 
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .weight(1f),
-                horizontalArrangement = Arrangement.Start,
-                verticalAlignment = Alignment.CenterVertically
+            FlowRow(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp),
             ) {
                 Chip(
                     text = item.concernNum,
-                    //invertColor = true,
-                    modifier = Modifier
-                        .padding(end = 4.dp),
                     prefixIcon = {
                         Icon(
                             imageVector = Icons.Default.PersonOutline,
@@ -250,14 +252,18 @@ private fun SearchForumItem(
                 )
                 Chip(
                     text = item.postNum,
-                    //invertColor = true,
-                    modifier = Modifier
-                        .padding(start = 4.dp),
                     prefixIcon = {
                         Icon(
                             imageVector = Icons.Default.MarkUnreadChatAlt,
-                            postNumSting
+                            contentDescription = postNumString
                         )
+                    },
+                    shape = MaterialTheme.shapes.small
+                )
+                Chip(
+                    text = stringResource(R.string.hot_num, hotNum?.getShortNumString() ?: "—"),
+                    prefixIcon = {
+                        Icon(Icons.Default.LocalFireDepartment, contentDescription = null)
                     },
                     shape = MaterialTheme.shapes.small
                 )

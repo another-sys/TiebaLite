@@ -952,6 +952,8 @@ interface ITiebaApi {
         keyword: String,
     ): Flow<SearchForumBean>
 
+    fun forumHeatFlow(forumName: String): Flow<ForumHeatBean>
+
     /**
      * 搜索贴
      *

@@ -24,6 +24,15 @@ import retrofit2.http.*
 
 
 interface OfficialTiebaApi {
+    // V12 omits hot_num. Use the current client version over HTTPS for this request.
+    @POST("https://tiebac.baidu.com/c/f/frs/frsBottom")
+    @FormUrlEncoded
+    fun forumHeatFlow(
+        @Field("kw") forumName: String,
+        @Field("_client_version") clientVersion: String = ClientVersion.TIEBA_V22.version,
+        @retrofit2.http.Header(Header.USER_AGENT) userAgent: String = "bdtb for Android $clientVersion",
+    ): Flow<ForumHeatBean>
+
     @POST("/c/f/pb/page")
     @FormUrlEncoded
     fun threadContent(

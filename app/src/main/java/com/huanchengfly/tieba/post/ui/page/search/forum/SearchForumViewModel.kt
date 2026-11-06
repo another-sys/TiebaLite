@@ -18,6 +18,7 @@ import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapConcat
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
@@ -28,6 +29,12 @@ import javax.inject.Inject
 @HiltViewModel
 class SearchForumViewModel @Inject constructor() :
     BaseViewModel<SearchForumUiIntent, SearchForumPartialChange, SearchForumUiState, SearchForumUiEvent>() {
+    private val heatLoader = ForumHeatLoader(
+        fetch = { TiebaApi.getInstance().forumHeatFlow(it).first().forum?.hotNum }
+    )
+
+    suspend fun loadForumHeat(forumName: String): Long? = heatLoader.load(forumName)
+
     override fun createInitialState() = SearchForumUiState()
 
     override fun createPartialChangeProducer(): PartialChangeProducer<SearchForumUiIntent, SearchForumPartialChange, SearchForumUiState> =
