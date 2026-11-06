@@ -26,6 +26,7 @@ import androidx.compose.material.Text
 import androidx.compose.material.pullrefresh.PullRefreshIndicator
 import androidx.compose.material.pullrefresh.rememberPullRefreshState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -42,7 +43,6 @@ import com.huanchengfly.tieba.post.api.models.protos.abstractText
 import com.huanchengfly.tieba.post.api.models.protos.frsPage.Classify
 import com.huanchengfly.tieba.post.arch.BaseComposeActivity.Companion.LocalWindowSizeClass
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
-import com.huanchengfly.tieba.post.arch.collectPartialAsState
 import com.huanchengfly.tieba.post.arch.onEvent
 import com.huanchengfly.tieba.post.arch.onGlobalEvent
 import com.huanchengfly.tieba.post.arch.pageViewModel
@@ -66,7 +66,6 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.MyLazyColumn
 import com.huanchengfly.tieba.post.ui.widgets.compose.VerticalDivider
 import com.huanchengfly.tieba.post.ui.widgets.compose.debounceClickable
 import kotlinx.collections.immutable.ImmutableList
-import kotlinx.collections.immutable.persistentListOf
 
 private fun getFirstLoadIntent(
     context: Context,
@@ -268,18 +267,35 @@ fun ForumThreadListPage(
     val navigator = LocalNavigator.current
     val snackbarHostState = LocalSnackbarHostState.current
 
+    // Read the cached StateFlow value synchronously, then update the whole snapshot together.
+    // Separate projections can briefly render only the forum rule and erase a restored position.
+    val uiState by viewModel.uiState.collectAsState()
+    val trace = rememberForumScrollTrace(forumId, isGood, viewModel, lazyListState, uiState)
+    val isRefreshing = uiState.isRefreshing
+    val isLoadingMore = uiState.isLoadingMore
+    val hasMore = uiState.hasMore
+    val currentPage = uiState.currentPage
+    val forumRuleTitle = uiState.forumRuleTitle
+    val threadList = uiState.threadList
+    val threadListIds = uiState.threadListIds
+    val goodClassifyId = uiState.goodClassifyId
+    val goodClassifies = uiState.goodClassifies
+
     LazyLoad(loaded = viewModel.initialized) {
+        trace("first_load")
         viewModel.send(getFirstLoadIntent(context, forumName, isGood))
         viewModel.initialized = true
     }
     onGlobalEvent<ForumThreadListUiEvent.Refresh>(
         filter = { it.isGood == isGood },
     ) {
+        trace("refresh source=global sort=${it.sortType}")
         viewModel.send(getRefreshIntent(context, forumName, isGood, it.sortType))
     }
     onGlobalEvent<ForumThreadListUiEvent.BackToTop>(
         filter = { it.isGood == isGood },
     ) {
+        trace("back_to_top source=forum_event")
         lazyListState.animateScrollToItem(0)
     }
     viewModel.onEvent<ForumThreadListUiEvent.AgreeFail> {
@@ -302,45 +318,12 @@ fun ForumThreadListPage(
             )
         }
     }
-    val isRefreshing by viewModel.uiState.collectPartialAsState(
-        prop1 = ForumThreadListUiState::isRefreshing,
-        initial = false
-    )
-    val isLoadingMore by viewModel.uiState.collectPartialAsState(
-        prop1 = ForumThreadListUiState::isLoadingMore,
-        initial = false
-    )
-    val hasMore by viewModel.uiState.collectPartialAsState(
-        prop1 = ForumThreadListUiState::hasMore,
-        initial = true
-    )
-    val currentPage by viewModel.uiState.collectPartialAsState(
-        prop1 = ForumThreadListUiState::currentPage,
-        initial = 1
-    )
-    val forumRuleTitle by viewModel.uiState.collectPartialAsState(
-        prop1 = ForumThreadListUiState::forumRuleTitle,
-        initial = null
-    )
-    val threadList by viewModel.uiState.collectPartialAsState(
-        prop1 = ForumThreadListUiState::threadList,
-        initial = persistentListOf()
-    )
-    val threadListIds by viewModel.uiState.collectPartialAsState(
-        prop1 = ForumThreadListUiState::threadListIds,
-        initial = persistentListOf()
-    )
-    val goodClassifyId by viewModel.uiState.collectPartialAsState(
-        prop1 = ForumThreadListUiState::goodClassifyId,
-        initial = null
-    )
-    val goodClassifies by viewModel.uiState.collectPartialAsState(
-        prop1 = ForumThreadListUiState::goodClassifies,
-        initial = persistentListOf()
-    )
     val pullRefreshState = rememberPullRefreshState(
         refreshing = isRefreshing,
-        onRefresh = { viewModel.send(getRefreshIntent(context, forumName, isGood)) }
+        onRefresh = {
+            trace("refresh source=pull")
+            viewModel.send(getRefreshIntent(context, forumName, isGood))
+        }
     )
     Box(
         modifier = Modifier.fillMaxSize()
@@ -353,6 +336,7 @@ fun ForumThreadListPage(
                     goodClassifyHolders = goodClassifies,
                     selectedItem = goodClassifyId,
                     onSelected = {
+                        trace("refresh source=classify classify=$it")
                         viewModel.send(
                             getRefreshIntent(
                                 context,
@@ -368,6 +352,7 @@ fun ForumThreadListPage(
             LoadMoreLayout(
                 isLoading = isLoadingMore,
                 onLoadMore = {
+                    trace("load_more")
                     viewModel.send(
                         getLoadMoreIntent(
                             context,
@@ -388,6 +373,7 @@ fun ForumThreadListPage(
                     state = lazyListState,
                     items = threadList,
                     onItemClicked = {
+                        trace("open_thread target=${it.threadId}")
                         navigator.navigate(
                             ThreadPageDestination(
                                 it.threadId,
@@ -397,6 +383,7 @@ fun ForumThreadListPage(
                         )
                     },
                     onItemReplyClicked = {
+                        trace("open_reply target=${it.threadId}")
                         navigator.navigate(
                             ThreadPageDestination(
                                 it.threadId,
@@ -416,9 +403,11 @@ fun ForumThreadListPage(
                     },
                     forumRuleTitle = forumRuleTitle,
                     onOpenForumRule = {
+                        trace("open_forum_rule")
                         navigator.navigate(ForumRuleDetailPageDestination(forumId))
                     },
                     onOriginThreadClicked = {
+                        trace("open_origin_thread target=${it.tid}")
                         navigator.navigate(
                             ThreadPageDestination(
                                 threadId = it.tid.toLong(),
@@ -426,7 +415,10 @@ fun ForumThreadListPage(
                             )
                         )
                     }
-                ) { navigator.navigate(UserProfilePageDestination(it.id)) }
+                ) {
+                    trace("open_user")
+                    navigator.navigate(UserProfilePageDestination(it.id))
+                }
             }
         }
 

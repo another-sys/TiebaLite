@@ -46,6 +46,7 @@ import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material.icons.rounded.VerticalAlignTop
 import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -86,7 +87,6 @@ import com.huanchengfly.tieba.post.R
 import com.huanchengfly.tieba.post.api.models.protos.frsPage.ForumInfo
 import com.huanchengfly.tieba.post.arch.GlobalEvent
 import com.huanchengfly.tieba.post.arch.ImmutableHolder
-import com.huanchengfly.tieba.post.arch.collectPartialAsState
 import com.huanchengfly.tieba.post.arch.emitGlobalEvent
 import com.huanchengfly.tieba.post.arch.emitGlobalEventSuspend
 import com.huanchengfly.tieba.post.arch.onEvent
@@ -432,27 +432,15 @@ fun ForumPage(
         )
     }
 
-    val isLoading by viewModel.uiState.collectPartialAsState(
-        prop1 = ForumUiState::isLoading,
-        initial = false
-    )
-    val isError by viewModel.uiState.collectPartialAsState(
-        prop1 = ForumUiState::isError,
-        initial = false
-    )
-    val forumInfo by viewModel.uiState.collectPartialAsState(
-        prop1 = ForumUiState::forum,
-        initial = null
-    )
-    val tbs by viewModel.uiState.collectPartialAsState(prop1 = ForumUiState::tbs, initial = null)
-    val navTabInfo by viewModel.uiState.collectPartialAsState(
-        prop1 = ForumUiState::navTabInfo,
-        initial = null
-    )
-    val generalTabs by remember {
-        derivedStateOf {
-            navTabInfo?.tab?.filter { it.isGeneralTab == 1 }?.filter { it.tabType == 15 } ?: emptyList()
-        }
+    // Keep the forum and its tabs present while returning to an already loaded page.
+    val uiState by viewModel.uiState.collectAsState()
+    val isLoading = uiState.isLoading
+    val isError = uiState.isError
+    val forumInfo = uiState.forum
+    val tbs = uiState.tbs
+    val navTabInfo = uiState.navTabInfo
+    val generalTabs = remember(navTabInfo) {
+        navTabInfo?.tab?.filter { it.isGeneralTab == 1 && it.tabType == 15 } ?: emptyList()
     }
 
     val account = LocalAccount.current
@@ -481,7 +469,7 @@ fun ForumPage(
         )
     }
 
-    val isListAtTop by remember {
+    val isListAtTop by remember(currentListState) {
         derivedStateOf {
             currentListState.firstVisibleItemIndex == 0 && currentListState.firstVisibleItemScrollOffset == 0
         }
@@ -491,7 +479,7 @@ fun ForumPage(
         derivedStateOf { heightOffset == 0f }
     }
 
-    val enablePullToRefresh by remember {
+    val enablePullToRefresh by remember(currentListState) {
         derivedStateOf { currentPage < 2 && isListAtTop && isHeaderExpanded }
     }
 
