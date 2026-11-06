@@ -1,4 +1,5 @@
 import com.android.build.gradle.internal.api.BaseVariantOutputImpl
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import java.util.Properties
 
 // 读取 application.properties
@@ -18,7 +19,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose.compiler)
-    alias(libs.plugins.kotlin.kapt)
+    //alias(libs.plugins.kotlin.kapt)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.kotlin.parcelize)
     alias(libs.plugins.hilt.android)
@@ -49,6 +50,10 @@ wire {
     }
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 android {
     buildToolsVersion = "36.0.0"
     compileSdk = 36
@@ -68,6 +73,7 @@ android {
     buildFeatures {
         compose = true
         buildConfig = true
+        viewBinding = true
     }
     signingConfigs {
         val keystoreFile = keystoreProperties.getProperty("keystore.file", "")
@@ -114,20 +120,11 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
         sourceCompatibility = JavaVersion.VERSION_17
     }
-    kotlinOptions {
-        jvmTarget = "17"
-        freeCompilerArgs += listOf(
-            "-P",
-            "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=" + layout.buildDirectory.asFile.get().absolutePath + "/compose_metrics"
-        )
-        freeCompilerArgs += listOf(
-            "-P",
-            "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=" + layout.buildDirectory.asFile.get().absolutePath + "/compose_metrics"
-        )
-        freeCompilerArgs += listOf(
-            "-P", "plugin:androidx.compose.compiler.plugins.kotlin:stabilityConfigurationPath=" +
-                    project.rootDir.absolutePath + "/compose_stability_configuration.txt"
-        )
+    composeCompiler {
+        metricsDestination.set(layout.buildDirectory.dir("compose_metrics"))
+        reportsDestination.set(layout.buildDirectory.dir("compose_metrics"))
+
+        stabilityConfigurationFile.set(rootProject.layout.projectDirectory.file("compose_stability_configuration.txt").asFile)
     }
     packaging {
         resources {
@@ -144,11 +141,12 @@ android {
 
             (this as BaseVariantOutputImpl).outputFileName = fileName
         }
-        kotlin.sourceSets {
-            getByName(variant.name) {
-                kotlin.srcDir("build/generated/ksp/${variant.name}/kotlin")
-            }
-        }
+    }
+}
+
+kotlin {
+    compilerOptions {
+        jvmTarget.set(JvmTarget.JVM_17)
     }
 }
 
@@ -171,14 +169,14 @@ dependencies {
     implementation(libs.compose.destinations.core)
     ksp(libs.compose.destinations.ksp)
 
-    implementation(libs.androidx.navigation.compose)
+    // implementation(libs.androidx.navigation.compose)
 
     api(libs.wire.runtime)
 
     implementation(libs.hilt.android)
-    kapt(libs.hilt.compiler)
+    ksp(libs.hilt.compiler)
     implementation(libs.androidx.hilt.navigation.compose)
-    kapt(libs.androidx.hilt.compiler)
+    ksp(libs.androidx.hilt.compiler)
 
     implementation(libs.accompanist.drawablepainter)
 
@@ -268,7 +266,9 @@ dependencies {
     implementation(libs.retrofit2.converter.wire)
 
     implementation(libs.google.gson)
-    implementation(libs.org.litepal.android.kotlin)
+    implementation(libs.androidx.room.runtime)
+    implementation(libs.androidx.room.ktx)
+    ksp(libs.androidx.room.compiler)
     implementation(libs.com.jaredrummler.colorpicker)
 
     implementation(libs.github.matisse)
@@ -277,6 +277,8 @@ dependencies {
 
     implementation(libs.com.github.yalantis.ucrop)
 
-    implementation(libs.com.jakewharton.butterknife)
-    kapt(libs.com.jakewharton.butterknife.compiler)
+    //implementation(libs.com.jakewharton.butterknife)
+    //ksp(libs.com.jakewharton.butterknife.compiler)
+
+    // ksp(libs.kotlin.metadata.jvm)
 }

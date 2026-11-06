@@ -1,10 +1,13 @@
 package com.huanchengfly.tieba.post.api.retrofit.interfaces
 
 import com.huanchengfly.tieba.post.api.models.protos.addPost.AddPostResponse
+import com.huanchengfly.tieba.post.api.models.protos.addPollPost.AddPollPostReponse
+import com.huanchengfly.tieba.post.api.models.protos.addThread.AddThreadResponse
 import com.huanchengfly.tieba.post.api.models.protos.forumGuide.ForumGuideResponse
 import com.huanchengfly.tieba.post.api.models.protos.forumRecommend.ForumRecommendResponse
 import com.huanchengfly.tieba.post.api.models.protos.forumRuleDetail.ForumRuleDetailResponse
 import com.huanchengfly.tieba.post.api.models.protos.frsPage.FrsPageResponse
+import com.huanchengfly.tieba.post.api.models.protos.GeneralTabList.GeneralTabListResponse
 import com.huanchengfly.tieba.post.api.models.protos.getBawuInfo.GetBawuInfoResponse
 import com.huanchengfly.tieba.post.api.models.protos.getForumDetail.GetForumDetailResponse
 import com.huanchengfly.tieba.post.api.models.protos.getHistoryForum.GetHistoryForumResponse
@@ -89,6 +92,11 @@ interface OfficialProtobufTiebaApi {
         @Body body: MyMultipartBody,
     ): Flow<AddPostResponse>
 
+    @POST("/c/c/thread/add?cmd=309730&format=protobuf")
+    fun addThreadFlow(
+        @Body body: MyMultipartBody,
+    ): Flow<AddThreadResponse>
+
     @POST("/c/s/searchSug?cmd=309438&format=protobuf")
     fun searchSugFlow(
         @Body body: MyMultipartBody,
@@ -133,4 +141,14 @@ interface OfficialProtobufTiebaApi {
     fun getHistoryForumFlow(
         @Body body: MyMultipartBody,
     ): Flow<GetHistoryForumResponse>
+
+    @POST("/c/c/post/addPollPost?cmd=309006&format=protobuf")
+    fun addPollPostProtobuf(
+        @Body body: MyMultipartBody,
+    ): Flow<AddPollPostReponse>
+
+    @POST("/c/f/frs/generalTabList?cmd=309622&format=protobuf")
+    fun generalTabListFlow(
+        @Body body: MyMultipartBody,
+    ): Flow<GeneralTabListResponse>
 }

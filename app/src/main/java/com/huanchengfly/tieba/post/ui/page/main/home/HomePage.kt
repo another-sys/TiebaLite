@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -104,6 +105,7 @@ import com.huanchengfly.tieba.post.ui.widgets.compose.rememberMenuState
 import com.huanchengfly.tieba.post.ui.widgets.compose.states.StateScreen
 import com.huanchengfly.tieba.post.utils.AccountUtil.LocalAccount
 import com.huanchengfly.tieba.post.utils.ImageUtil
+import com.huanchengfly.tieba.post.utils.StringUtil.getShortNumString
 import com.huanchengfly.tieba.post.utils.TiebaUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
 import kotlinx.collections.immutable.persistentListOf
@@ -456,7 +458,7 @@ private fun ForumItemContent(
                 Avatar(
                     data = item.avatar,
                     size = 40.dp,
-                    contentDescription = null,
+                    contentDescription = stringResource(R.string.forum_portrait),
                     shape = RoundedCornerShape(30)
                 )
                 Spacer(modifier = Modifier.width(10.dp))
@@ -574,7 +576,7 @@ private fun ForumItem(
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun HomePage(
-    viewModel: HomeViewModel = pageViewModel<HomeUiIntent, HomeViewModel>(listOf(HomeUiIntent.Refresh)),
+    viewModel: HomeViewModel = pageViewModel(),
     canOpenExplore: Boolean = false,
     onOpenExplore: () -> Unit = {},
 ) {
@@ -583,7 +585,7 @@ fun HomePage(
     val navigator = LocalNavigator.current
     val isLoading by viewModel.uiState.collectPartialAsState(
         prop1 = HomeUiState::isLoading,
-        initial = true
+        initial = false
     )
     val forums by viewModel.uiState.collectPartialAsState(
         prop1 = HomeUiState::forums,
@@ -605,8 +607,15 @@ fun HomePage(
         prop1 = HomeUiState::error,
         initial = null
     )
+    val hasLoaded by viewModel.uiState.collectPartialAsState(
+        prop1 = HomeUiState::hasLoaded,
+        initial = false
+    )
     val isLoggedIn = remember(account) { account != null }
     val isEmpty by remember { derivedStateOf { forums.isEmpty() } }
+    val showEmptyState by remember {
+        derivedStateOf { isEmpty && (!isLoggedIn || hasLoaded) }
+    }
     val hasTopForum by remember { derivedStateOf { topForums.isNotEmpty() } }
     val showHistoryForum by remember { derivedStateOf { context.appPreferences.homePageShowHistoryForum && historyForums.isNotEmpty() } }
     var listSingle by remember { mutableStateOf(context.appPreferences.listSingle) }
@@ -616,7 +625,7 @@ fun HomePage(
     onGlobalEvent<GlobalEvent.Refresh>(
         filter = { it.key == "home" }
     ) {
-        viewModel.send(HomeUiIntent.Refresh)
+        if (isLoggedIn) viewModel.send(HomeUiIntent.Refresh)
     }
 
     var unfollowForum by remember { mutableStateOf<HomeUiState.Forum?>(null) }
@@ -638,7 +647,10 @@ fun HomePage(
     }
 
     LaunchedEffect(Unit) {
-        if (viewModel.initialized) viewModel.send(HomeUiIntent.RefreshHistory)
+        if (isLoggedIn && !viewModel.initialized) {
+            viewModel.send(HomeUiIntent.RefreshHistory)
+            viewModel.send(HomeUiIntent.Refresh)
+        }
     }
 
     MyScaffold(
@@ -668,7 +680,7 @@ fun HomePage(
     ) { contentPaddings ->
         val pullRefreshState = rememberPullRefreshState(
             refreshing = isLoading,
-            onRefresh = { viewModel.send(HomeUiIntent.Refresh) }
+            onRefresh = { if (isLoggedIn) viewModel.send(HomeUiIntent.Refresh) }
         )
         Box(
             modifier = Modifier
@@ -680,14 +692,14 @@ fun HomePage(
                     navigator.navigate(SearchPageDestination)
                 }
                 StateScreen(
-                    isEmpty = isEmpty,
+                    isEmpty = showEmptyState,
                     isError = isError,
                     isLoading = isLoading,
                     modifier = Modifier
                         .fillMaxSize()
                         .weight(1f),
                     onReload = {
-                        viewModel.send(HomeUiIntent.Refresh)
+                        if (isLoggedIn) viewModel.send(HomeUiIntent.Refresh)
                     },
                     emptyScreen = {
                         EmptyScreen(

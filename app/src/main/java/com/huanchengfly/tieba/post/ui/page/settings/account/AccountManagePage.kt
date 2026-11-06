@@ -402,16 +402,16 @@ fun AccountManagePage(
                                                 AccountUtil.newAccount(
                                                     fetchedAccount.uid,
                                                     fetchedAccount
-                                                ) { success ->
+                                                ) { accountId ->
                                                     // Launch a new coroutine to handle the callback
                                                     GlobalScope.launch(Dispatchers.Main) {
-                                                        if (success) {
+                                                        if (accountId > 0) {
                                                             Toast.makeText(
                                                                 context,
                                                                 R.string.toast_token_login_success,
                                                                 Toast.LENGTH_SHORT
                                                             ).show()
-                                                            AccountUtil.switchAccount(context, fetchedAccount.id)
+                                                            AccountUtil.switchAccount(context, accountId.toInt())
                                                         } else {
                                                             Toast.makeText(
                                                                 context,

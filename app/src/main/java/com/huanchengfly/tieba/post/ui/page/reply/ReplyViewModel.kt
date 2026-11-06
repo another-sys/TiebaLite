@@ -7,9 +7,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import com.huanchengfly.tieba.post.App
 import com.huanchengfly.tieba.post.R
-import com.huanchengfly.tieba.post.api.models.AddThreadBean
 import com.huanchengfly.tieba.post.api.models.UploadPictureResultBean
 import com.huanchengfly.tieba.post.api.models.protos.addPost.AddPostResponse
+import com.huanchengfly.tieba.post.api.models.protos.addThread.AddThreadResponse
 import com.huanchengfly.tieba.post.api.retrofit.exception.TiebaUnknownException
 import com.huanchengfly.tieba.post.api.retrofit.exception.getErrorCode
 import com.huanchengfly.tieba.post.api.retrofit.exception.getErrorMessage
@@ -110,21 +110,22 @@ class ReplyViewModel @Inject constructor() :
 
         private fun ReplyUiIntent.Send.producePartialChange(): Flow<ReplyPartialChange.Send> {
             if (forumId != 0L && threadId == 0L ) {
+                val threadTitle = title.orEmpty()
                 return AddPostRepository
                     .addThread(
                         content,
                         forumId,
                         forumName,
-                        title = "",//这三个后面再做
+                        title = threadTitle,
                         isHide = 1,
-                        isTitle = 1,
+                        isTitle = if (threadTitle.isBlank()) 1 else 0,
                     )
-                    .map<AddThreadBean, ReplyPartialChange.Send> {
-                        if (it.tid == null) throw TiebaUnknownException
+                    .map<AddThreadResponse, ReplyPartialChange.Send> {
+                        if (it.data_ == null) throw TiebaUnknownException
                         ReplyPartialChange.Send.Success(
-                            threadId = it.tid!!,
-                            postId = it.pid.orEmpty(),
-                            expInc = ""
+                            threadId = it.data_.tid,
+                            postId = it.data_.pid,
+                            expInc = it.data_.exp?.inc.orEmpty()
                         )
                     }
                     .onStart { emit(ReplyPartialChange.Send.Start) }
@@ -222,6 +223,7 @@ sealed interface ReplyUiIntent : UiIntent {
         val forumName: String,
         val threadId: Long,
         val tbs: String,
+        val title: String? = null,
         val postId: Long? = null,
         val subPostId: Long? = null,
         val replyUserId: Long? = null,

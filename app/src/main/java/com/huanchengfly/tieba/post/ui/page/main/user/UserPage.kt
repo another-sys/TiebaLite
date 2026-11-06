@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.eygraber.compose.placeholder.material.placeholder
 import com.huanchengfly.tieba.post.R
+import com.huanchengfly.tieba.post.api.ClientVersion
 import com.huanchengfly.tieba.post.arch.collectPartialAsState
 import com.huanchengfly.tieba.post.arch.pageViewModel
 import com.huanchengfly.tieba.post.models.database.Account
@@ -53,6 +54,7 @@ import com.huanchengfly.tieba.post.ui.common.theme.compose.pullRefreshIndicator
 import com.huanchengfly.tieba.post.ui.page.LocalNavigator
 import com.huanchengfly.tieba.post.ui.page.destinations.AboutPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.AppThemePageDestination
+import com.huanchengfly.tieba.post.ui.page.destinations.FollowListPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.HistoryPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.SettingsPageDestination
 import com.huanchengfly.tieba.post.ui.page.destinations.ThreadStorePageDestination
@@ -97,7 +99,8 @@ private fun StatCardPlaceholder(modifier: Modifier = Modifier) {
 @Composable
 private fun StatCard(
     account: Account,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    onFollowClick: (() -> Unit)? = null
 ) {
     val postNum by animateIntAsState(targetValue = account.postNum?.toIntOrNull() ?: 0)
     val fansNum by animateIntAsState(targetValue = account.fansNum?.toIntOrNull() ?: 0)
@@ -108,7 +111,12 @@ private fun StatCard(
     ) {
         StatCardItem(
             statNum = concernNum,
-            statText = stringResource(id = R.string.text_stat_follow)
+            statText = stringResource(id = R.string.text_stat_follow),
+            modifier = if (onFollowClick != null) {
+                Modifier.clickable(onClick = onFollowClick)
+            } else {
+                Modifier
+            }
         )
         HorizontalDivider(color = Color(if (ExtendedTheme.colors.isNightMode) 0xFF808080 else 0xFFDEDEDE))
         StatCardItem(
@@ -175,10 +183,11 @@ private fun InfoCard(
 @Composable
 private fun RowScope.StatCardItem(
     statNum: Int,
-    statText: String
+    statText: String,
+    modifier: Modifier = Modifier
 ) {
     Column(
-        modifier = Modifier.weight(1f),
+        modifier = modifier.weight(1f),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Text(
@@ -300,7 +309,10 @@ fun UserPage(
                             .padding(16.dp)
                             .clip(RoundedCornerShape(8.dp))
                             .background(color = ExtendedTheme.colors.chip)
-                            .padding(vertical = 18.dp)
+                            .padding(vertical = 18.dp),
+                        onFollowClick = {
+                            navigator.navigate(FollowListPageDestination())
+                        }
                     )
                 } else if (isLoading) {
                     InfoCard(
@@ -370,7 +382,7 @@ fun UserPage(
                         onClick = {
                             navigator.navigate(
                                 WebViewPageDestination(
-                                    initialUrl = "https://tieba.baidu.com/mo/q/hybrid-main-service/uegServiceCenter?cuid=${CuidUtils.getNewCuid()}&cuid_galaxy2=${CuidUtils.getNewCuid()}&cuid_gid=&timestamp=${System.currentTimeMillis()}&_client_version=12.52.1.0&nohead=1"
+                                    initialUrl = "https://tieba.baidu.com/mo/q/hybrid-main-service/uegServiceCenter?cuid=${CuidUtils.getNewCuid()}&cuid_galaxy2=${CuidUtils.getNewCuid()}&cuid_gid=&timestamp=${System.currentTimeMillis()}&_client_version=${ClientVersion.TIEBA_V12.version}&nohead=1"
                                 )
                             )
                         },

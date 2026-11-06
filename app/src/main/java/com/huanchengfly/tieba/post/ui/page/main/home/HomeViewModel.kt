@@ -14,11 +14,12 @@ import com.huanchengfly.tieba.post.arch.UiEvent
 import com.huanchengfly.tieba.post.arch.UiIntent
 import com.huanchengfly.tieba.post.arch.UiState
 import com.huanchengfly.tieba.post.models.database.History
-import com.huanchengfly.tieba.post.models.database.TopForum
 import com.huanchengfly.tieba.post.ui.page.main.home.SortType.*
 import com.huanchengfly.tieba.post.utils.AccountUtil
+import com.huanchengfly.tieba.post.utils.DatabaseUtil
 import com.huanchengfly.tieba.post.utils.HistoryUtil
 import com.huanchengfly.tieba.post.utils.appPreferences
+import com.huanchengfly.tieba.post.utils.FollowedForumsCache
 import kotlinx.collections.immutable.ImmutableList
 import kotlinx.collections.immutable.persistentListOf
 import kotlinx.collections.immutable.toImmutableList
@@ -35,7 +36,7 @@ import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.onStart
-import org.litepal.LitePal
+import kotlinx.coroutines.flow.zip
 
 // 排序类型枚举
 enum class SortType(internal val apiParam: Int) {
@@ -133,46 +134,37 @@ class HomeViewModel : BaseViewModel<HomeUiIntent, HomePartialChange, HomeUiState
         private fun <T> Flow<T>.mergeWith(other: Flow<T>): Flow<T> = merge(this, other)
 
         @Suppress("USELESS_CAST")
-        private fun produceRefreshPartialChangeFlow(): Flow<HomePartialChange.Refresh> =
-            HistoryUtil.getFlow(HistoryUtil.TYPE_FORUM, 0)
-                .flatMapConcat { historyForums ->
-                    // 获取当前排序类型
-                    val currentSortType = viewModel.getCurrentSortType()
-
-                    // 直接使用枚举中定义的API参数
-                    TiebaApi.getInstance().forumGuideNewFlow(currentSortType.apiParam)
-                        .map { forumRecommend ->
-                            val forums = forumRecommend.data_?.like_forum?.map {
-                                HomeUiState.Forum(
-                                    it.avatar,
-                                    it.forum_id.toString(),
-                                    it.forum_name,
-                                    it.is_sign == 1,
-                                    it.level_id.toString(),
-                                    it.hot_num
-                                )
-                            } ?: emptyList()
-                            Pair(forums, historyForums)
-                        }
+        private fun produceRefreshPartialChangeFlow(): Flow<HomePartialChange.Refresh> {
+            val currentSortType = viewModel.getCurrentSortType()
+            return HistoryUtil.getFlow(HistoryUtil.TYPE_FORUM, 0).zip(
+                TiebaApi.getInstance().allForumGuideFlow(sortType = currentSortType.apiParam)
+            ) { historyForums, forumGuideBean ->
+                val allLikeForums = forumGuideBean.likeForum
+                val forums = allLikeForums.map {
+                    HomeUiState.Forum(
+                        it.avatar,
+                        it.forumId.toString(),
+                        it.forumName,
+                        it.isSign == 1,
+                        it.levelId.toString(),
+                        it.hotNum
+                    )
                 }
-                .map { (forums, historyForums) ->
-                    val topForumsDB = LitePal.findAll(TopForum::class.java).map { it.forumId }
-                    // 获取当前排序类型用于本地排序
-                    val currentSortType = viewModel.getCurrentSortType()
+                FollowedForumsCache.updateAll(allLikeForums)
 
-                    // 使用枚举中定义的排序函数
-                    val sortedForums = currentSortType.sort(forums)
-                    val topForums = sortedForums.filter { topForumsDB.contains(it.forumId) }
-
-                    HomePartialChange.Refresh.Success(
-                        sortedForums,
-                        topForums,
-                        historyForums,
-                        currentSortType
-                    ) as HomePartialChange.Refresh
-                }
+                val topForumsDB = DatabaseUtil.getTopForums().map { it.forumId }.toSet()
+                val sortedForums = currentSortType.sort(forums)
+                val topForums = sortedForums.filter { it.forumId in topForumsDB }
+                HomePartialChange.Refresh.Success(
+                    sortedForums,
+                    topForums,
+                    historyForums,
+                    currentSortType
+                ) as HomePartialChange.Refresh
+            }
                 .onStart { emit(HomePartialChange.Refresh.Start) }
                 .catch { emit(HomePartialChange.Refresh.Failure(it)) }
+        }
 
         @Suppress("USELESS_CAST")
         private fun produceRefreshHistoryPartialChangeFlow(): Flow<HomePartialChange.RefreshHistory> =
@@ -181,24 +173,16 @@ class HomeViewModel : BaseViewModel<HomeUiIntent, HomePartialChange, HomeUiState
                 .catch { emit(HomePartialChange.RefreshHistory.Failure(it)) }
 
         private fun HomeUiIntent.TopForums.Delete.toPartialChangeFlow() =
-            flow {
-                val deletedRows = LitePal.deleteAll(TopForum::class.java, "forumId = ?", forumId)
-                if (deletedRows > 0) {
-                    emit(HomePartialChange.TopForums.Delete.Success(forumId))
-                } else {
-                    emit(HomePartialChange.TopForums.Delete.Failure("forum $forumId is not top!"))
-                }
+            flow<HomePartialChange.TopForums.Delete> {
+                DatabaseUtil.deleteTopForum(forumId)
+                emit(HomePartialChange.TopForums.Delete.Success(forumId))
             }.flowOn(Dispatchers.IO)
                 .catch { emit(HomePartialChange.TopForums.Delete.Failure(it.getErrorMessage())) }
 
         private fun HomeUiIntent.TopForums.Add.toPartialChangeFlow() =
-            flow {
-                val success = TopForum(forum.forumId).saveOrUpdate("forumId = ?", forum.forumId)
-                if (success) {
-                    emit(HomePartialChange.TopForums.Add.Success(forum))
-                } else {
-                    emit(HomePartialChange.TopForums.Add.Failure("未知错误"))
-                }
+            flow<HomePartialChange.TopForums.Add> {
+                DatabaseUtil.addTopForum(forum.forumId)
+                emit(HomePartialChange.TopForums.Add.Success(forum))
             }.flowOn(Dispatchers.IO)
                 .catch { emit(HomePartialChange.TopForums.Add.Failure(it.getErrorMessage())) }
 
@@ -260,6 +244,7 @@ sealed interface HomePartialChange : PartialChange<HomeUiState> {
             when (this) {
                 is Success -> oldState.copy(
                     isLoading = false,
+                    hasLoaded = true,
                     forums = forums.toImmutableList(),
                     topForums = topForums.toImmutableList(),
                     historyForums = historyForums.toImmutableList(),
@@ -267,7 +252,7 @@ sealed interface HomePartialChange : PartialChange<HomeUiState> {
                     sortType = sortType
                 )
 
-                is Failure -> oldState.copy(isLoading = false, error = error)
+                is Failure -> oldState.copy(isLoading = false, hasLoaded = true, error = error)
                 Start -> oldState.copy(isLoading = true)
             }
 
@@ -357,7 +342,8 @@ sealed interface HomePartialChange : PartialChange<HomeUiState> {
 
 @Immutable
 data class HomeUiState(
-    val isLoading: Boolean = true,
+    val isLoading: Boolean = false,
+    val hasLoaded: Boolean = false,
     val forums: ImmutableList<Forum> = persistentListOf(),
     val topForums: ImmutableList<Forum> = persistentListOf(),
     val historyForums: ImmutableList<History> = persistentListOf(),
